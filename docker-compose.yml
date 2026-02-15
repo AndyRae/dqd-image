@@ -1,0 +1,10 @@
+services:
+  dqd:
+    build: .
+    env_file: .env
+    volumes:
+      # Results written here (DQD_OUTPUT_FOLDER should be /output)
+      - ./output:/output
+    # Optional: override for one-off runs
+    # environment:
+    #   - DQD_NUM_THREADS=4
