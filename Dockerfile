@@ -2,7 +2,6 @@ FROM rocker/r-ver:4.4.1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        curl \
         openjdk-11-jdk \
         libxml2-dev \
         libpcre2-dev \
@@ -25,10 +24,14 @@ RUN install2.r --error --ncpus 2 \
 RUN R -e "remotes::install_github('OHDSI/DataQualityDashboard')"
 
 RUN mkdir -p /output /jdbc \
-    && curl -sL -o /jdbc/postgresql.jar \
-        "https://jdbc.postgresql.org/download/postgresql-42.7.3.jar"
+    && R -e 'DatabaseConnector::downloadJdbcDrivers("postgresql", pathToDriver = "/jdbc")'
 
 COPY run_dqd.R /run_dqd.R
+
+RUN adduser --disabled-password --gecos "" --uid 1000 r-dqd \
+    && chown -R r-dqd:r-dqd /output
+
+USER r-dqd
 
 VOLUME ["/output"]
 
