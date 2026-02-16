@@ -1,0 +1,71 @@
+name: Build and publish DQD image
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  SOURCE_REPO: OHDSI/DataQualityDashboard
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Get latest upstream release
+        id: upstream
+        run: |
+          TAG=$(gh api repos/${{ env.SOURCE_REPO }}/releases/latest --jq '.tag_name')
+          VERSION=${TAG#v}
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Upstream release: $TAG ($VERSION)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Check if image already exists
+        id: check
+        run: |
+          STATUS=$(gh api orgs/${{ github.repository_owner }}/packages/container/$(basename ${{ github.repository }})/versions \
+            --jq "[.[] | select(.metadata.container.tags[] == \"${{ steps.upstream.outputs.version }}\")] | length" 2>/dev/null || echo "0")
+          if [ "$STATUS" != "0" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Image ${{ steps.upstream.outputs.version }} already exists, skipping"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Checkout
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        if: steps.check.outputs.skip != 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: steps.check.outputs.skip != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        if: steps.check.outputs.skip != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ steps.upstream.outputs.version }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
