@@ -10,9 +10,9 @@ This repository checks every night for a new version, and publishes the image.
 docker run --rm --env-file .env -v "$(pwd)/output:/output" ghcr.io/andyrae/dqd-image:latest
 ```
 
-Results are written to `./output` (JSON, logs, and any error files). The container runs as a non-root user (UID 1000); if the host `./output` directory isn’t writable by that user, create it and fix ownership first, e.g. `mkdir -p output && chown 1000:1000 output`.
+Results are written to `./output` (JSON, logs, and any error files). The container runs as a non-root user (UID 1000).
 
-## Configuration
+## Configure
 
 All behaviour is controlled by environment variables (see `.env.example`):
 
